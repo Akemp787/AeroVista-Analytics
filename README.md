@@ -18,119 +18,124 @@ AeroVista does the work.
 - Selects the relevant data from your registered sources
 - Builds and executes a structured analytical plan using deterministic Python and SQL
 - Backs every finding with evidence linked to specific source records
-- Surfaces discrepancies and conflicts for human review — not silent assumptions
-- Packages validated results into role-specific deliverables (Excel, PDF, summary reports)
-- Saves successful workflows as recurring organizational procedures
+- Surfaces discrepancies and exceptions for your review — with evidence and recommended decisions
+- Packages validated results into finished deliverables (Excel workbooks, HTML reports)
+- Saves successful analyses as recurring procedures that can be re-run with new data
 
-**Raw data never leaves your machine.** No cloud upload, no SaaS, no data sharing.
+**Your data never leaves your machine.** No cloud upload, no SaaS, no data sharing.
 
 ---
 
-## Core Capabilities
+## Multi-Client Workspace Isolation
 
-### Analysis Case Framework
-Every analytical request creates a tracked **Analysis Case** — a first-class domain object that follows a full lifecycle from question to validated delivery.
+AeroVista is built for practitioners who work with multiple clients or projects. Each client has a completely isolated workspace — sources, cases, rules, mappings, and deliverables are separated at the backend. No data from one client can appear in another client's workspace.
 
-```
-Draft → Running → Needs Review → Validated → Delivered → Archived
-```
+---
 
-Cases are stored locally in SQLite. Status transitions are enforced. A case cannot be marked Validated with open review items. Nothing falls through the cracks.
+## Key Capabilities
 
-### Evidence-Backed Findings
-Every material conclusion is a **Finding** linked to **Evidence Items** — specific source records, row counts, and computed values that support the claim. Not a narrative summary. Actual evidence.
-
-### Exception Management
-Discrepancies, conflicts, status mismatches, and ambiguous records are raised as **Exception Records** and routed to a **Review Center** where a human decides. Decisions are recorded, attributed, and reproducible.
+### What You Get in a Single Run
+- A structured **Analysis Case** with status tracking from question to delivery
+- **Findings** — material conclusions, each backed by specific evidence records
+- **Exception Records** — discrepancies, conflicts, and uncertainties automatically classified by type and severity
+- **Review Tasks** — items requiring a human decision, presented with evidence and options
+- **Deliverables** — Excel workbook and HTML report, ready to share
 
 ### Dataset Comparison
-Compare any two datasets regardless of schema:
-- Records only in A or only in B
-- Records matched by key with changed field values
-- Duplicate key detection
-- Summary/footer row detection
-- Semantic column classification (IDs, emails, dates, amounts, statuses)
-
-### SQL Safety Layer
-All SQL runs through an AST-based validator before execution. Destructive operations (`DROP`, `DELETE`, `UPDATE`, `ALTER`, `TRUNCATE`, `INSERT`) are blocked at the parse level — not by pattern matching. DuckDB runs in read-only mode with enforced row limits.
-
-### Source Registry
-Every dataset has a stable ID derived from its content hash — not its filename. Renaming a file doesn't break anything. Uploading the same file twice doesn't create duplicates.
-
-Supported formats: Excel (multi-sheet), CSV, TSV, JSON, JSONL, Parquet, SQLite, DuckDB.
-
-### Workflow Studio
-Analytical workflows are defined in YAML or JSON and stored with versioning:
-- 28+ registered step types (source, transform, SQL, validation, review, visualization, deliverable)
-- Cycle detection and dependency ordering
-- Draft and published versioning
-- Full run history
+Compare any two datasets regardless of schema. AeroVista automatically detects:
+- Records only in one source
+- Matched records with changed values
+- Duplicate keys
+- Footer/total rows
+- Semantic column types (IDs, emails, names, dates, amounts, status)
 
 ### Recurring Procedures
-Any validated Analysis Case can be saved as a **Recurring Procedure** — a published workflow that can be re-run with new inputs, versioned, and compared run-over-run. Successful work becomes organizational memory.
+Any completed analysis can be saved as a procedure. Re-run it later with new files — AeroVista executes deterministically and shows exactly what changed since last time.
+
+### Business Rules Library
+Per-client, versioned organizational definitions referenced by name in analyses. Rules are versioned — past runs retain the rule version that was active at execution time.
+
+### Field Mapping Library
+Maps your source column names to universal semantic roles (e.g. `MemberID` → `customer_identifier`). Versioned, per-client, with drift detection when a mapped column disappears from the source.
+
+### Workflow Recommendations
+AeroVista tracks which workflows you've run for each client and surfaces recommendations when you start a new analysis, scored by recency, frequency, and keyword matching.
+
+### Deterministic Execution
+All calculations are performed by Python, DuckDB SQL, Polars, and registered statistical libraries. The language model (if configured) interprets requests, proposes plans, and narrates validated results — it does not count records, compare rows, calculate totals, or generate financial values.
+
+### SQL Safety
+All SQL passes through a SQLGlot AST-based safety validator before execution. Destructive operations (`DROP`, `DELETE`, `UPDATE`, `ALTER`, etc.) are blocked. DuckDB runs in read-only mode.
 
 ### Visualization Engine
-Chart generation with Plotly, Matplotlib, and Excel backends. 14 chart types. Charts are validated against the result data before rendering. Misleading configurations are rejected automatically.
-
-### Data Trust Engine
-Entity matching and golden record resolution across multiple source systems:
-- Fuzzy name matching with configurable confidence thresholds
-- Duplicate detection and merge proposals
-- Field-level conflict tracking
-- Audit trail for every resolution decision
-
-### Run Manifests
-Every run saves a complete reproducibility record: source content hashes, SQL executed, transformations applied, validation results, timings, deliverable paths, warnings, and errors. Any past run can be reproduced exactly.
+Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards, bar, line, area, scatter, histogram, pie/donut, waterfall, and actual-vs-forecast charts.
 
 ---
 
-## Who It's For
+## What It Runs On
 
-AeroVista is built for organizations that do real analytical work — membership reconciliations, financial audits, CRM cleanups, data migrations, status investigations — but don't have the budget or need for a full data team.
-
-Typical use cases:
-- Membership reconciliation (payments vs. active status vs. CRM)
-- Pre-migration data audits (finding duplicates, missing fields, invalid formats)
-- Period-end financial summaries and exception reports
-- CRM data quality audits across multiple source systems
-- Compliance evidence packages with complete source lineage
+- **Python 3.11+**, runs locally as a single HTTP server on `localhost:8513`
+- Browser-based UI — no Electron, no installer
+- SQLite for all persistence (cases, procedures, clients, mappings)
+- Optional: Ollama for local LLM narration (keeps data fully on-machine)
 
 ---
 
-## Technology
+## Use Cases
 
-| Layer | What's Used |
+- **Membership reconciliation** — find members who paid but are still inactive, lapsed records, duplicate memberships
+- **Payment verification** — cross-reference payment files against membership status
+- **Data audit** — profile columns, find nulls, type inconsistencies, duplicates
+- **Cross-source comparison** — compare two exports and produce a structured change report
+- **Recurring reporting** — build a procedure once, run it each month with new files
+
+---
+
+## Local Desktop App
+
+```bash
+cd 00_Core_Library
+pip install -e .
+python apps/aerovista_local_desktop.py
+# Opens at http://localhost:8513
+```
+
+### App Pages
+
+| Page | Purpose |
 |---|---|
-| Execution engine | Python, DuckDB, Polars |
-| SQL safety | SQLGlot (AST-level parsing) |
-| Persistence | SQLite (cases, workflows, procedures, manifests) |
-| Visualization | Plotly, Matplotlib, openpyxl |
-| Local app | Single-file Python HTTP server, no framework dependencies |
-| AI narration | Ollama (local) — optional, gracefully disabled if not present |
+| **Home** | New analysis prompt, review queue, recent cases, recurring procedures |
+| **Analysis Cases** | Full history of completed analyses with status filter |
+| **Review Center** | Resolve open exceptions — view evidence, make decisions |
+| **Procedures** | Published and draft recurring procedures |
+| **Client Workspaces** | Create and switch between isolated client environments |
+| **Business Rules** | Per-client versioned rule library |
+| **Field Mappings** | Per-client column-to-semantic-role mapping with drift detection |
+| **Data Sources** | Registered datasets with stable IDs |
+| **Deliverables** | Download generated workbooks and reports |
 
 ---
 
-## Status
+## Phase History
 
-AeroVista is in active development as a production internal tool.
+| Phase | What Was Built |
+|---|---|
+| 1 | Foundation: SourceRegistry, SQLGlot SQL safety, DuckDB execution, RunManifest |
+| 2 | ChartEngine, WorkflowStudio, dataset_id wired to frontend |
+| 3 | Analytical Operations System: AnalysisCase, Finding, ExceptionRecord, ReviewTask, RecurringProcedure |
+| 4 | Dataset Comparison UI, exception classification, side-by-side procedure run comparison |
+| 5 | Multi-client workspace isolation, Field Mapping Library, Workflow History and Recommendations |
 
-| Phase | Description | Status |
-|---|---|---|
-| Phase 1 | Foundation — source registry, SQL safety, run manifests | Complete |
-| Phase 2 | Wiring — dataset IDs, chart engine, workflow studio | Complete |
-| Phase 3 | Domain model — Analysis Cases, evidence, review center, procedures | Complete |
-| Phase 4 | Planned — business question planner, expanded workflow library | Upcoming |
-
-**225+ tests passing across the full analytical stack.**
-
----
-
-## About AeroVista Analytics
-
-AeroVista Analytics is an independent analytics consultancy specializing in data reconciliation, migration support, and operational reporting for associations and small-to-mid-size organizations.
-
-This engine is the internal tooling that powers our client delivery work.
+**459 tests passing.**
 
 ---
 
-*Source code is maintained in a private repository. This page describes the system's capabilities and current development status.*
+## What AeroVista Is Not
+
+- Not a dashboard platform
+- Not a drag-and-drop ETL tool
+- Not a data-science notebook
+- Not a cloud service or SaaS
+- Not a general-purpose AI chatbot
+
+AeroVista completes analytical work. You ask a business question. It does the work, shows the evidence, routes uncertainty for your review, produces finished outputs, and preserves the process as organizational memory.
