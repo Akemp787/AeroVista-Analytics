@@ -65,7 +65,29 @@ AeroVista tracks which workflows you've run for each client and surfaces recomme
 All calculations are performed by Python, DuckDB SQL, Polars, and registered statistical libraries. The language model (if configured) interprets requests, proposes plans, and narrates validated results — it does not count records, compare rows, calculate totals, or generate financial values.
 
 ### SQL Safety
-All SQL passes through a SQLGlot AST-based safety validator before execution. Destructive operations (`DROP`, `DELETE`, `UPDATE`, `ALTER`, etc.) are blocked. DuckDB runs in read-only mode.
+All SQL passes through a SQLGlot AST-based safety validator before execution. The validator keyword-filters input, enforces a single SELECT statement, rejects recursive CTEs, and walks the full parse tree rejecting every non-SELECT node type. Destructive operations (`DROP`, `DELETE`, `UPDATE`, `ALTER`, `EXEC`, and others) are blocked at both the keyword and AST level. The validator fails closed if SQLGlot is not installed — it never defaults to allowing unvalidated SQL. DuckDB runs in read-only mode.
+
+### Secure Remote Data Connections
+
+AeroVista now connects directly to live remote data sources for clients who need analysis against production databases and cloud storage, not file exports.
+
+**Supported connectors:** PostgreSQL, Amazon S3, BigQuery
+
+Every connection request passes through five independent enforcement layers:
+
+- **Credential isolation** — stored in OS keyring; never logged, never in workflow YAML, never returned to the UI after initial entry. Production mode fails closed if keyring is unavailable.
+- **Scope enforcement** — table and path access is validated before any SQL is built or I/O begins. Out-of-scope requests are rejected immediately with a typed error.
+- **Path authorization** — S3 object keys are URL-decoded, checked for traversal components (including `%2e%2e` encoded variants), and verified against approved prefixes at the component level — `approved/data_other` cannot satisfy an `approved/data` prefix.
+- **SQL AST allowlist** — LLM-generated and user-provided SQL must pass the AST validator before execution against any remote source.
+- **Client isolation** — connection registry enforces `client_id` on every read, write, and list. Cross-client access returns nothing or raises a permission error.
+
+### Query Pushdown
+
+AeroVista plans queries before executing them. The query planner determines which operations (column projection, predicate filtering, LIMIT) can be pushed to the remote source and which must stay local. Parquet files on S3 support column projection and predicate pushdown via PyArrow. BigQuery supports dry-run cost estimation before execution.
+
+### Audit Trail
+
+Every connector call — queries, connection tests, catalog inspections — writes an immutable audit entry with event type, timestamps, rows returned, duration, status, and a secrets-scrubbed error message (when applicable). The audit log is client-scoped and queryable by event type, status, connection, and date. A built-in Streamlit component renders the full audit history for any client workspace.
 
 ### Visualization Engine
 Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards, bar, line, area, scatter, histogram, pie/donut, waterfall, and actual-vs-forecast charts.
@@ -76,8 +98,9 @@ Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards
 
 - **Python 3.11+**, runs locally as a single HTTP server on `localhost:8513`
 - Browser-based UI — no Electron, no installer
-- SQLite for all persistence (cases, procedures, clients, mappings)
+- SQLite for all persistence (cases, procedures, clients, connections, audit log)
 - Optional: Ollama for local LLM narration (keeps data fully on-machine)
+- Optional: boto3, psycopg2-binary, google-cloud-bigquery for live remote connections
 
 ---
 
@@ -88,6 +111,7 @@ Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards
 - **Data audit** — profile columns, find nulls, type inconsistencies, duplicates
 - **Cross-source comparison** — compare two exports and produce a structured change report
 - **Recurring reporting** — build a procedure once, run it each month with new files
+- **Live database analysis** — connect directly to a PostgreSQL database or S3 bucket and run scoped, validated queries without exporting data first
 
 ---
 
@@ -112,6 +136,8 @@ python apps/aerovista_local_desktop.py
 | **Business Rules** | Per-client versioned rule library |
 | **Field Mappings** | Per-client column-to-semantic-role mapping with drift detection |
 | **Data Sources** | Registered datasets with stable IDs |
+| **Connections** | Manage live remote data connections per client workspace |
+| **Audit Log** | Client-scoped history of every connector call with status and timing |
 | **Deliverables** | Download generated workbooks and reports |
 
 ---
@@ -125,8 +151,24 @@ python apps/aerovista_local_desktop.py
 | 3 | Analytical Operations System: AnalysisCase, Finding, ExceptionRecord, ReviewTask, RecurringProcedure |
 | 4 | Dataset Comparison UI, exception classification, side-by-side procedure run comparison |
 | 5 | Multi-client workspace isolation, Field Mapping Library, Workflow History and Recommendations |
+| 7 | Secure Data Connections: PostgreSQL, S3, BigQuery connectors; CredentialStore; ConnectionRegistry; RemoteQueryPlanner; SQL AST validator; query fingerprint caching |
+| 7.1 | Security hardening: URL-encoded path traversal prevention; component-level prefix comparison; credential fail-closed gate; scope enforcement in all three connectors before SQL build; ResolvedDataset no-secrets contract; 219 new security tests |
+| 8 | Audit trail: ConnectorExecutor wraps all I/O with automatic audit writes; list_audit filtering by event type and status; audit_summary aggregates; client-scoped Streamlit audit UI component |
 
-**459 tests passing.**
+**573 tests passing.**
+
+---
+
+## What's Next
+
+The immediate roadmap from here:
+
+- **Connections UI page** — full Streamlit page for managing live connections per client: create, test, edit, disable, and browse the catalog. Integrates the audit log component.
+- **LLM-assisted query generation** — accept a natural-language question, produce parameterized SQL through the AST validator, execute via `ConnectorExecutor`, and return results as an Analysis Case finding.
+- **Scheduled procedures** — run saved procedures on a cron or file-arrival trigger; results written to the analysis case history automatically.
+- **Schema drift detection** — compare the current remote schema fingerprint against the last-recorded version; surface drift as a system warning before executing a procedure that depends on the changed table.
+- **Additional connectors** — MySQL, SQL Server, Snowflake, Google Cloud Storage (blocked in Phase 7.1 scope; next connector phase after hardening is verified stable).
+- **Exportable audit reports** — produce an Excel or PDF audit trail report for a given client, time range, or event type — useful for compliance reviews and client deliverables.
 
 ---
 
