@@ -113,6 +113,10 @@ AeroVista interoperates with Power BI and Tableau instead of trying to replace t
 
 A typed, code-free dashboard layer turns results into KPI cards, tables, and charts driven by **specifications rather than hand-written UI code**. Dashboards support global and per-panel filters, drill-through to the supporting evidence rows, downloadable panel data, and saved, reusable layouts that can be re-run against new data. Because a dashboard is just typed data, the same definition is reproducible and shareable.
 
+### REST API & Web Frontend
+
+AeroVista is moving to a modern application split: a **FastAPI** backend with typed, OpenAPI-documented endpoints runs beside the existing app (migrated incrementally, one endpoint group at a time, so nothing breaks), and a **React + TypeScript** frontend consumes it. The API ships consistent error envelopes with request IDs for correlation, an authentication seam (open locally, API-key protected when configured), client-scoped routes that never return credentials, and a Server-Sent Events transport for live run progress. The engine remains fully usable on its own — the API is a thin layer over it, with no analytical logic in the HTTP routes.
+
 ### Visualization Engine
 Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards, bar, line, area, scatter, histogram, pie/donut, waterfall, and actual-vs-forecast charts.
 
@@ -189,7 +193,7 @@ python apps/aerovista_local_desktop.py
 
 The immediate roadmap from here:
 
-- **Modern application split** — a FastAPI backend with typed, OpenAPI-documented endpoints and a React/TypeScript frontend, migrated incrementally (strangler pattern) beside the existing app with verified parity before any cutover.
+- **Modern application split (underway)** — the FastAPI backend is in place with read-only endpoint groups, auth, and an SSE progress transport, plus a typed React/TypeScript frontend scaffold. Remaining: port write endpoints and the rest of the pages, then serve the built frontend from the API on one origin.
 - **Migrate more workflows to the compiled runtime** — Join & Reconciliation next, then Entity Matching and Duplicate Detection, each with golden fixtures and legacy dual-run verification before sign-off.
 - **Run, execution, and technical-plan screens** — show the business objective and estimated plan before a run; live progress, current step, and cancellation during a run; and an expandable technical view of the logical plan, physical graph, selected engines, pushdown decisions, and validation results.
 - **Connections UI page** — full Streamlit page for managing live connections per client: create, test, edit, disable, and browse the catalog. Integrates the audit log component.
