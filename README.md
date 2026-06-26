@@ -89,6 +89,22 @@ AeroVista plans queries before executing them. The query planner determines whic
 
 Every connector call — queries, connection tests, catalog inspections — writes an immutable audit entry with event type, timestamps, rows returned, duration, status, and a secrets-scrubbed error message (when applicable). The audit log is client-scoped and queryable by event type, status, connection, and date. A built-in Streamlit component renders the full audit history for any client workspace.
 
+### Compiled Execution Runtime
+
+AeroVista no longer behaves like a loose collection of Python workflow functions. Underneath the familiar Analysis Case experience there is now a **local-first workflow compiler and execution runtime**: you describe what you need as a typed workflow, and AeroVista compiles it into an optimized execution graph, runs it through specialized engines in isolated worker processes, records every intermediate result as an immutable artifact, logs an append-only event history, and validates the output independently.
+
+- **Typed workflow plans** — workflows are typed, versioned, serializable data (no embedded code), so the same analysis is reproducible and reviewable.
+- **A real compiler** — six stages: validate → resolve client context (datasets, rule and mapping versions, scope) → logical plan → optimize → select engines → physical graph. Optimizations include predicate and column pushdown, redundant-scan elimination, and a guard against accidental many-to-many blow-ups.
+- **Specialized backends** — heavy work runs on DuckDB, Polars, and Apache Arrow rather than row-by-row Python.
+- **Observable execution** — every run is a directed graph of steps with durable state. Runs can be cancelled, resumed after an interruption, and partially re-run; completed steps are cached by a content fingerprint and never reused across clients.
+- **Isolated workers** — a workflow failure can never crash the app; a worker crash or timeout is reported as a failed step.
+- **Immutable artifacts & audit events** — results are written once and never mutated in place; an append-only event log records the full run history with secrets redacted.
+- **Independent validation** — execution completing and the result being *validated* are separate states. A case is not "validated" while required checks fail.
+
+**Dataset Comparison** is the first workflow fully migrated to this runtime, and it is verified by a **dual-run** check: the same comparison is executed through both the legacy engine and the new compiled runtime, and the reconciled counts and record classifications must match exactly before the migration is trusted.
+
+Your existing cases, procedures, rules, and mappings are preserved — the new engine produces the same trusted Analysis Case experience through a stronger foundation.
+
 ### Visualization Engine
 Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards, bar, line, area, scatter, histogram, pie/donut, waterfall, and actual-vs-forecast charts.
 
@@ -154,8 +170,9 @@ python apps/aerovista_local_desktop.py
 | 7 | Secure Data Connections: PostgreSQL, S3, BigQuery connectors; CredentialStore; ConnectionRegistry; RemoteQueryPlanner; SQL AST validator; query fingerprint caching |
 | 7.1 | Security hardening: URL-encoded path traversal prevention; component-level prefix comparison; credential fail-closed gate; scope enforcement in all three connectors before SQL build; ResolvedDataset no-secrets contract; 219 new security tests |
 | 8 | Audit trail: ConnectorExecutor wraps all I/O with automatic audit writes; list_audit filtering by event type and status; audit_summary aggregates; client-scoped Streamlit audit UI component |
+| 9 | Compiled execution runtime: typed Workflow IR, action/algorithm registries, six-stage compiler with pushdown optimization, physical execution DAG, durable job coordinator, isolated multiprocessing workers, immutable artifact store, append-only event store, fingerprint cache, formal validation runtime, and Dataset Comparison migrated with legacy dual-run verification |
 
-**573 tests passing.**
+**731 tests passing.**
 
 ---
 
@@ -163,6 +180,8 @@ python apps/aerovista_local_desktop.py
 
 The immediate roadmap from here:
 
+- **Migrate more workflows to the compiled runtime** — Join & Reconciliation next, then Entity Matching and Duplicate Detection, each with golden fixtures and legacy dual-run verification before sign-off.
+- **Run, execution, and technical-plan screens** — show the business objective and estimated plan before a run; live progress, current step, and cancellation during a run; and an expandable technical view of the logical plan, physical graph, selected engines, pushdown decisions, and validation results.
 - **Connections UI page** — full Streamlit page for managing live connections per client: create, test, edit, disable, and browse the catalog. Integrates the audit log component.
 - **LLM-assisted query generation** — accept a natural-language question, produce parameterized SQL through the AST validator, execute via `ConnectorExecutor`, and return results as an Analysis Case finding.
 - **Scheduled procedures** — run saved procedures on a cron or file-arrival trigger; results written to the analysis case history automatically.
