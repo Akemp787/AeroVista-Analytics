@@ -71,7 +71,7 @@ All SQL passes through a SQLGlot AST-based safety validator before execution. Th
 
 AeroVista now connects directly to live remote data sources for clients who need analysis against production databases and cloud storage, not file exports.
 
-**Supported connectors:** PostgreSQL, Amazon S3, BigQuery
+**Supported connectors:** PostgreSQL, Amazon S3, BigQuery, SQLite, DuckDB. Each connector publishes a formal **capability contract** — SQL dialect, authentication methods, supported pushdowns, schema/table discovery, streaming, pagination, sampling, row-count estimation, and audit events — so the engine knows what a source can do before it connects. Additional connectors (SQL Server, MySQL, Snowflake, Redshift, Databricks, Google Cloud Storage, Azure Blob Storage) are declared in the connector catalog and fail closed until implemented — never a silent fallback.
 
 Every connection request passes through five independent enforcement layers:
 
@@ -104,6 +104,14 @@ AeroVista no longer behaves like a loose collection of Python workflow functions
 **Dataset Comparison** is the first workflow fully migrated to this runtime, and it is verified by a **dual-run** check: the same comparison is executed through both the legacy engine and the new compiled runtime, and the reconciled counts and record classifications must match exactly before the migration is trusted.
 
 Your existing cases, procedures, rules, and mappings are preserved — the new engine produces the same trusted Analysis Case experience through a stronger foundation.
+
+### BI-Compatible Outputs
+
+AeroVista interoperates with Power BI and Tableau instead of trying to replace them. From any analysis it can produce a **refreshable export package**: clean tables in Parquet, CSV, and Excel; a data dictionary (column types, semantic roles, null rates); detected relationships between tables; a star-schema fact/dimension model; and recommended measures and dimensions — plus a manifest and documented connection paths for both Power BI and Tableau. Paths stay stable across refreshes, so a BI data source keeps working as the data updates. All outputs are vendor-neutral; no BI tool is required to produce or read them.
+
+### Native Dashboards
+
+A typed, code-free dashboard layer turns results into KPI cards, tables, and charts driven by **specifications rather than hand-written UI code**. Dashboards support global and per-panel filters, drill-through to the supporting evidence rows, downloadable panel data, and saved, reusable layouts that can be re-run against new data. Because a dashboard is just typed data, the same definition is reproducible and shareable.
 
 ### Visualization Engine
 Chart generation with Plotly, Matplotlib, and Excel backends. Supports KPI cards, bar, line, area, scatter, histogram, pie/donut, waterfall, and actual-vs-forecast charts.
@@ -171,8 +179,9 @@ python apps/aerovista_local_desktop.py
 | 7.1 | Security hardening: URL-encoded path traversal prevention; component-level prefix comparison; credential fail-closed gate; scope enforcement in all three connectors before SQL build; ResolvedDataset no-secrets contract; 219 new security tests |
 | 8 | Audit trail: ConnectorExecutor wraps all I/O with automatic audit writes; list_audit filtering by event type and status; audit_summary aggregates; client-scoped Streamlit audit UI component |
 | 9 | Compiled execution runtime: typed Workflow IR, action/algorithm registries, six-stage compiler with pushdown optimization, physical execution DAG, durable job coordinator, isolated multiprocessing workers, immutable artifact store, append-only event store, fingerprint cache, formal validation runtime, and Dataset Comparison migrated with legacy dual-run verification |
+| 10 | External analytical systems: connector capability contracts + extensible catalog; SQLite and DuckDB local connectors; BI-compatible exports (data dictionaries, star schema, refreshable Power BI / Tableau packages); native typed-spec dashboards with filters, drill-through, and saved layouts |
 
-**731 tests passing.**
+**Over 800 tests passing across all lines of work.**
 
 ---
 
@@ -180,6 +189,7 @@ python apps/aerovista_local_desktop.py
 
 The immediate roadmap from here:
 
+- **Modern application split** — a FastAPI backend with typed, OpenAPI-documented endpoints and a React/TypeScript frontend, migrated incrementally (strangler pattern) beside the existing app with verified parity before any cutover.
 - **Migrate more workflows to the compiled runtime** — Join & Reconciliation next, then Entity Matching and Duplicate Detection, each with golden fixtures and legacy dual-run verification before sign-off.
 - **Run, execution, and technical-plan screens** — show the business objective and estimated plan before a run; live progress, current step, and cancellation during a run; and an expandable technical view of the logical plan, physical graph, selected engines, pushdown decisions, and validation results.
 - **Connections UI page** — full Streamlit page for managing live connections per client: create, test, edit, disable, and browse the catalog. Integrates the audit log component.
